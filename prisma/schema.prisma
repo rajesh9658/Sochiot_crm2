@@ -1,0 +1,649 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+}
+
+enum UserRole {
+  SUPER_ADMIN      // Platform-level admin
+  COMPANY_ADMIN    // Company owner/administrator
+  MANAGER          // Team manager
+  FIELD_SALES      // Field sales executive
+  SALES_EXECUTIVE  // Inside sales
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CONVERTED
+  LOST
+  ON_HOLD
+}
+
+enum ActivityType {
+  CALL
+  VISIT
+  MEETING
+  EMAIL
+  WHATSAPP
+}
+
+enum ActivityOutcome {
+  SUCCESSFUL
+  NO_RESPONSE
+  CALLBACK
+  NOT_INTERESTED
+  CONVERTED
+  PENDING
+}
+
+enum FollowupType {
+  CALL
+  VISIT
+  MEETING
+  EMAIL
+}
+
+enum FollowupPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum FollowupStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum DealStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  BANK_TRANSFER
+  UPI
+  CARD
+}
+
+enum PaymentStatus {
+  RECEIVED
+  PENDING_CLEARANCE
+  CLEARED
+  BOUNCED
+}
+
+enum InterestLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ============================================
+// CORE TENANCY - Company as Root
+// ============================================
+
+model Company {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  industry  String?   @db.VarChar(100)
+  phone     String?   @db.VarChar(20)
+  email     String?   @db.VarChar(255)
+  address   String?   @db.Text
+  city      String?   @db.VarChar(100)
+  state     String?   @db.VarChar(100)
+  country   String    @default("India") @db.VarChar(100)
+  
+  // Subscription
+  planId            BigInt
+  subscriptionStatus String    @default("ACTIVE") @db.VarChar(50)
+  subscriptionEndsAt DateTime?
+  
+  // Limits tracking
+  currentUsers      Int       @default(0)
+  currentStorage    BigInt    @default(0)
+  
+  isActive  Boolean   @default(true) @map("is_active")
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  plan              Plan          @relation(fields: [planId], references: [id])
+  users             CompanyUser[]
+  customers         Customer[]
+  activities        Activity[]
+  followups         Followup[]
+  deals             Deal[]
+  payments          Payment[]
+  userTargets       UserTarget[]
+  customerCategories CustomerCategory[]
+  productInterests  ProductInterest[]
+  roles             Role[]
+  auditLogs         AuditLog[]
+
+  @@index([isActive])
+  @@index([planId])
+  @@map("companies")
+}
+
+model Plan {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?   @db.Text
+  
+  // Limits
+  maxUsers    Int
+  maxStorage  BigInt    // in bytes
+  
+  // Features (simple bitmask or JSON)
+  features    Json?     // { "advancedReports": true, "apiAccess": false }
+  
+  // Pricing
+  priceMonthly Decimal   @db.Decimal(10,2)
+  priceYearly  Decimal   @db.Decimal(10,2)
+  currency     String    @default("INR")
+  
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  companies   Company[]
+
+  @@map("plans")
+}
+
+// ============================================
+// USER & MEMBERSHIP
+// ============================================
+
+model User {
+  id              BigInt    @id @default(autoincrement())
+  email           String    @unique @db.VarChar(255)
+  passwordHash    String
+  firstName       String    @db.VarChar(100)
+  lastName        String    @db.VarChar(100)
+  phone           String?   @db.VarChar(20)
+  avatar          String?
+  
+  // Security
+  lastLoginAt     DateTime?
+  emailVerified   Boolean   @default(false)
+  emailVerifyToken String?  @unique
+  resetToken      String?   @unique
+  
+  status          UserStatus @default(ACTIVE)
+  
+  // Global super admin flag (rare)
+  isSuperAdmin    Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  companyMemberships CompanyUser[]
+  createdAuditLogs   AuditLog[] @relation("CreatedByUser")
+  targetUserAudit    AuditLog[] @relation("TargetUser")
+
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+model CompanyUser {
+  id           BigInt    @id @default(autoincrement())
+  companyId    BigInt    @map("company_id")
+  userId       BigInt    @map("user_id")
+  roleId       BigInt?   @map("role_id")  // Custom role (optional)
+  
+  // Employee-specific fields (moved from Employee model)
+  employeeCode String    @map("employee_code") @db.VarChar(50)
+  territory    String?   @db.VarChar(255)
+  managerId    BigInt?   @map("manager_id")
+  joiningDate  DateTime? @map("joining_date") @db.Date
+  
+  // System role (for basic access control)
+  systemRole   UserRole  @default(FIELD_SALES) @map("system_role")
+  
+  isActive     Boolean   @default(true) @map("is_active")
+  
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  // Relations
+  company      Company   @relation(fields: [companyId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
+  manager      CompanyUser? @relation("UserHierarchy", fields: [managerId], references: [id])
+  role         Role?     @relation(fields: [roleId], references: [id])
+  
+  // Reverse relations
+  subordinates CompanyUser[] @relation("UserHierarchy")
+  
+  // CRM relations (replaces Employee relations)
+  assignedCustomers  Customer[]    @relation("AssignedUser")
+  activities         Activity[]
+  activityNotes      ActivityNote[]
+  assignedFollowups  Followup[]
+  deals              Deal[]
+  paymentsCollected  Payment[]
+  targets            UserTarget[]
+
+  @@unique([companyId, employeeCode])
+  @@unique([companyId, userId])
+  @@index([companyId, isActive])
+  @@index([companyId, systemRole])
+  @@index([managerId])
+  @@index([userId])
+  @@map("company_users")
+}
+
+// ============================================
+// SIMPLE RBAC
+// ============================================
+
+model Role {
+  id          BigInt    @id @default(autoincrement())
+  companyId   BigInt    @map("company_id")
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  isSystem    Boolean   @default(false)  // Predefined roles that can't be deleted
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Relations
+  company     Company        @relation(fields: [companyId], references: [id])
+  permissions RolePermission[]
+  users       CompanyUser[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("roles")
+}
+
+model Permission {
+  id          Int       @id @default(autoincrement())
+  resource    String    @db.VarChar(100)  // e.g., "customer", "deal", "report"
+  action      String    @db.VarChar(50)   // e.g., "create", "read", "update", "delete", "manage"
+  description String?   @db.Text
+
+  // Relations
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           BigInt   @id @default(autoincrement())
+  roleId       BigInt   @map("role_id")
+  permissionId Int      @map("permission_id")
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// CRM MODELS (All linked to Company + CompanyUser)
+// ============================================
+
+model CustomerCategory {
+  id          Int      @id @default(autoincrement())
+  companyId   BigInt   @map("company_id")
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Relations
+  company     Company    @relation(fields: [companyId], references: [id])
+  customers   Customer[]
+
+  @@unique([companyId, name])
+  @@map("customer_categories")
+}
+
+model Customer {
+  id           BigInt      @id @default(autoincrement())
+  companyId    BigInt      @map("company_id")
+  customerCode String      @map("customer_code") @db.VarChar(50)
+  categoryId   Int         @map("category_id")
+  name         String      @db.VarChar(255)
+  businessName String?     @map("business_name") @db.VarChar(255)
+  phone        String?     @db.VarChar(20)
+  email        String?     @db.VarChar(255)
+  address      String?     @db.Text
+  city         String?     @db.VarChar(100)
+  state        String?     @db.VarChar(100)
+  pincode      String?     @db.VarChar(10)
+  
+  // Lead management
+  leadStatus   LeadStatus  @default(NEW) @map("lead_status")
+  leadSource   String?     @map("lead_source") @db.VarChar(100)
+  assignedTo   BigInt?     @map("assigned_to")  // CompanyUser ID
+  
+  // Business details
+  gstNumber    String?     @map("gst_number") @db.VarChar(20)
+  panNumber    String?     @map("pan_number") @db.VarChar(15)
+  creditLimit  Decimal     @default(0) @map("credit_limit") @db.Decimal(15, 2)
+  
+  isActive     Boolean     @default(true) @map("is_active")
+  convertedAt  DateTime?   @map("converted_at")
+  
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+
+  // Relations
+  company      Company          @relation(fields: [companyId], references: [id])
+  category     CustomerCategory @relation(fields: [categoryId], references: [id])
+  assignedUser CompanyUser?     @relation("AssignedUser", fields: [assignedTo], references: [id])
+  
+  // Reverse relations
+  activities       Activity[]
+  followups        Followup[]
+  deals            Deal[]
+  productInterests ProductInterest[]
+
+  @@unique([companyId, customerCode])
+  @@index([companyId, leadStatus])
+  @@index([companyId, assignedTo])
+  @@index([companyId, city])
+  @@index([companyId, phone])
+  @@index([companyId, email])
+  @@map("customers")
+}
+
+model Activity {
+  id               BigInt           @id @default(autoincrement())
+  companyId        BigInt           @map("company_id")
+  userId           BigInt           @map("user_id")  // CompanyUser ID
+  customerId       BigInt           @map("customer_id")
+  
+  activityType     ActivityType     @map("activity_type")
+  activityDate     DateTime         @map("activity_date")
+  durationMinutes  Int?             @map("duration_minutes")
+  
+  purpose          String?          @db.VarChar(255)
+  outcome          ActivityOutcome  @default(PENDING)
+  
+  // Location tracking
+  locationLatitude  Decimal?        @map("location_latitude") @db.Decimal(10, 8)
+  locationLongitude Decimal?        @map("location_longitude") @db.Decimal(11, 8)
+  locationAddress   String?         @map("location_address") @db.Text
+  
+  nextFollowupDate DateTime?        @map("next_followup_date") @db.Date
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company     @relation(fields: [companyId], references: [id])
+  user     CompanyUser @relation(fields: [userId], references: [id])
+  customer Customer    @relation(fields: [customerId], references: [id])
+  
+  // Reverse relations
+  notes     ActivityNote[]
+  followups Followup[]
+
+  @@index([companyId, activityDate])
+  @@index([companyId, userId, activityDate])
+  @@index([companyId, customerId, activityDate])
+  @@index([companyId, nextFollowupDate])
+  @@map("activities")
+}
+
+model ActivityNote {
+  id         BigInt   @id @default(autoincrement())
+  activityId BigInt   @map("activity_id")
+  userId     BigInt   @map("user_id")  // CompanyUser ID
+  note       String   @db.Text
+  isInternal Boolean  @default(false) @map("is_internal")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  activity Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     CompanyUser @relation(fields: [userId], references: [id])
+
+  @@index([activityId])
+  @@map("activity_notes")
+}
+
+model Followup {
+  id           BigInt           @id @default(autoincrement())
+  companyId    BigInt           @map("company_id")
+  activityId   BigInt?          @map("activity_id")
+  customerId   BigInt           @map("customer_id")
+  assignedTo   BigInt           @map("assigned_to")  // CompanyUser ID
+  
+  followupDate DateTime         @map("followup_date") @db.Date
+  followupType FollowupType     @map("followup_type")
+  priority     FollowupPriority @default(MEDIUM)
+  
+  subject      String?          @db.VarChar(255)
+  description  String?          @db.Text
+  
+  status       FollowupStatus   @default(PENDING)
+  completedAt  DateTime?        @map("completed_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company     @relation(fields: [companyId], references: [id])
+  activity Activity?   @relation(fields: [activityId], references: [id])
+  customer Customer    @relation(fields: [customerId], references: [id])
+  user     CompanyUser @relation(fields: [assignedTo], references: [id])
+
+  @@index([companyId, followupDate, status])
+  @@index([companyId, assignedTo, followupDate])
+  @@index([companyId, customerId, followupDate])
+  @@map("followups")
+}
+
+model Deal {
+  id                   BigInt     @id @default(autoincrement())
+  companyId            BigInt     @map("company_id")
+  dealNumber           String     @map("deal_number") @db.VarChar(50)
+  customerId           BigInt     @map("customer_id")
+  userId               BigInt     @map("user_id")  // CompanyUser ID
+  
+  dealDate             DateTime   @map("deal_date") @db.Date
+  dealAmount           Decimal    @map("deal_amount") @db.Decimal(15, 2)
+  discountAmount       Decimal    @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  taxAmount            Decimal    @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  finalAmount          Decimal    @map("final_amount") @db.Decimal(15, 2)
+  
+  paymentTerms         String?    @map("payment_terms") @db.VarChar(255)
+  dealStatus           DealStatus @default(ACTIVE) @map("deal_status")
+  
+  expectedDeliveryDate DateTime?  @map("expected_delivery_date") @db.Date
+  actualDeliveryDate   DateTime?  @map("actual_delivery_date") @db.Date
+  
+  notes String? @db.Text
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company     @relation(fields: [companyId], references: [id])
+  customer Customer    @relation(fields: [customerId], references: [id])
+  user     CompanyUser @relation(fields: [userId], references: [id])
+  
+  // Reverse relations
+  payments Payment[]
+
+  @@unique([companyId, dealNumber])
+  @@index([companyId, dealDate])
+  @@index([companyId, customerId])
+  @@index([companyId, userId])
+  @@index([companyId, dealStatus])
+  @@map("deals")
+}
+
+model Payment {
+  id                   BigInt        @id @default(autoincrement())
+  companyId            BigInt        @map("company_id")
+  dealId               BigInt        @map("deal_id")
+  paymentNumber        String        @map("payment_number") @db.VarChar(50)
+  
+  paymentDate          DateTime      @map("payment_date") @db.Date
+  amount               Decimal       @db.Decimal(15, 2)
+  paymentMethod        PaymentMethod @map("payment_method")
+  transactionReference String?       @map("transaction_reference") @db.VarChar(100)
+  
+  collectedBy          BigInt        @map("collected_by")  // CompanyUser ID
+  paymentStatus        PaymentStatus @default(RECEIVED) @map("payment_status")
+  
+  notes String? @db.Text
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company     @relation(fields: [companyId], references: [id])
+  deal     Deal        @relation(fields: [dealId], references: [id])
+  user     CompanyUser @relation(fields: [collectedBy], references: [id])
+
+  @@unique([companyId, paymentNumber])
+  @@index([companyId, paymentDate])
+  @@index([companyId, dealId])
+  @@index([companyId, collectedBy])
+  @@map("payments")
+}
+
+model UserTarget {
+  id                      BigInt  @id @default(autoincrement())
+  companyId               BigInt  @map("company_id")
+  userId                  BigInt  @map("user_id")  // CompanyUser ID
+  
+  targetDate              DateTime @map("target_date") @db.Date
+  
+  callsTarget             Int      @default(0) @map("calls_target")
+  visitsTarget            Int      @default(0) @map("visits_target")
+  meetingsTarget          Int      @default(0) @map("meetings_target")
+  
+  salesTargetAmount       Decimal  @default(0) @map("sales_target_amount") @db.Decimal(15, 2)
+  collectionTargetAmount  Decimal  @default(0) @map("collection_target_amount") @db.Decimal(15, 2)
+  
+  newCustomersTarget      Int      @default(0) @map("new_customers_target")
+  
+  notes String? @db.Text
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company     @relation(fields: [companyId], references: [id])
+  user     CompanyUser @relation(fields: [userId], references: [id])
+
+  @@unique([userId, targetDate])
+  @@index([companyId, targetDate])
+  @@index([companyId, userId])
+  @@map("user_targets")
+}
+
+model ProductInterest {
+  id               BigInt        @id @default(autoincrement())
+  companyId        BigInt        @map("company_id")
+  customerId       BigInt        @map("customer_id")
+  
+  productCategory  String        @map("product_category") @db.VarChar(100)
+  productName      String?       @map("product_name") @db.VarChar(255)
+  quantityEstimate String?       @map("quantity_estimate") @db.VarChar(100)
+  budgetRange      String?       @map("budget_range") @db.VarChar(100)
+  
+  interestLevel    InterestLevel @default(MEDIUM) @map("interest_level")
+  
+  notes String? @db.Text
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  company  Company  @relation(fields: [companyId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([companyId, customerId])
+  @@index([companyId, productCategory])
+  @@map("product_interests")
+}
+
+// ============================================
+// SIMPLE AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  companyId   BigInt?  @map("company_id")
+  userId      BigInt?  @map("user_id")    // User who performed action
+  targetUserId BigInt? @map("target_user_id") // User affected (if any)
+  
+  action      String   @db.VarChar(100)   // e.g., "CREATE", "UPDATE", "DELETE", "LOGIN"
+  entityType  String   @db.VarChar(50)    // e.g., "Customer", "Deal", "User"
+  entityId    BigInt?                      // ID of affected record
+  
+  oldValue    Json?    // For updates
+  newValue    Json?    // For updates
+  
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.Text
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company     Company? @relation(fields: [companyId], references: [id])
+  user        User?    @relation("CreatedByUser", fields: [userId], references: [id])
+  targetUser  User?    @relation("TargetUser", fields: [targetUserId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
