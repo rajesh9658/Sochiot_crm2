@@ -7,14 +7,6 @@ import  { BadRequestError, UnauthorizedError } from '../utils/AppError';
 import emailService from '../services/email.service';
 import crypto from 'crypto';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: { id: number; email: string; isSuperAdmin: boolean ; companyId?: number; role?: string };
-    }
-  }
-}
-
 export const registerSuperAdmin = async (
   req: Request,
   res: Response,

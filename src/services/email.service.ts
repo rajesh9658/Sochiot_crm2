@@ -51,10 +51,16 @@ class EmailService {
     });
   }
 
-  async sendCompanyInvitation(email: string, companyName: string, inviteToken: string) {
+  async sendCompanyInvitation(
+    email: string,
+    companyName: string,
+    tempPassword: string,
+    inviteToken: string
+  ) {
     const acceptUrl = `${process.env.APP_URL}/accept-invite?token=${inviteToken}`;
     const html = `
       <h1>You've been invited to ${companyName}</h1>
+      <p>Your temporary password: <strong>${tempPassword}</strong></p>
       <p>Click the link below to accept the invitation and set up your account:</p>
       <a href="${acceptUrl}">${acceptUrl}</a>
       <p>This invitation expires in 7 days.</p>
@@ -64,6 +70,21 @@ class EmailService {
       from: process.env.FROM_EMAIL,
       to: email,
       subject: `Invitation to join ${companyName}`,
+      html
+    });
+  }
+
+  async sendExistingUserInvitation(email: string, companyName: string) {
+    const html = `
+      <h1>You've been added to ${companyName}</h1>
+      <p>Your account already exists.</p>
+      <p>Please login at: ${process.env.APP_URL}/login</p>
+    `;
+
+    await this.transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: `Added to ${companyName}`,
       html
     });
   }

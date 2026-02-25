@@ -36,9 +36,9 @@ export const authenticate = async (
     }
 
     // Attach user to request
-    const companyId = user.companyMemberships[0]?.companyId ? Number(user.companyMemberships[0].companyId) : undefined;
+    const companyId = user.companyMemberships[0]?.companyId;
     req.user = {
-      id: Number(user.id),
+      id: user.id,
       email: user.email,
       ...(companyId !== undefined && { companyId }),
       isSuperAdmin: user.isSuperAdmin,

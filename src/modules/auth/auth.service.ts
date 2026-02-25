@@ -1,7 +1,6 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { generateAccessToken, generateRefreshToken } from '../../lib/jwt'
-import { UserRole } from '@prisma/client'
 
 export class AuthService {
   static async registerCompany(data: any) {
@@ -33,7 +32,7 @@ export class AuthService {
           companyId: company.id,
           userId: user.id,
           employeeCode: "ADMIN-001",
-          systemRole: UserRole.COMPANY_ADMIN,
+          systemRole: 'COMPANY_ADMIN',
         },
       })
 
