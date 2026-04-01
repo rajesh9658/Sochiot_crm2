@@ -5,10 +5,10 @@ import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 
-import { errorHandler } from './middleware/errorHandler.js';
-import authRoutes from './routes/auth.routes.js';
-import companyRoutes from './routes/company.routes.js';
-import planRoutes from './routes/plan.routes.js';
+import { errorHandler } from './middleware/errorHandler';
+import authRoutes from './routes/auth.routes';
+import companyRoutes from './routes/company.routes';
+import planRoutes from './routes/plan.routes';
 
 const app = express();
 
