@@ -6,8 +6,8 @@ import {
   getPlanById,
   updatePlan,
   deletePlan
-} from '../controllers/plan.controller';
-import { authenticate, requireSuperAdmin } from '../middleware/auth';
+} from '../controllers/plan.controller.js';
+import { authenticate, requireSuperAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
