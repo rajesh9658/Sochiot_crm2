@@ -390,6 +390,9 @@ model Customer {
   @@index([companyId, phone])
   @@index([companyId, email])
   @@map("customers")
+  @@index([companyId, createdAt])
+  @@index([companyId, customerCode])
+  
 }
 
 model Activity {
@@ -613,6 +616,7 @@ model ProductInterest {
   @@index([companyId, customerId])
   @@index([companyId, productCategory])
   @@map("product_interests")
+  @@index([companyId, interestLevel])
 }
 
 // ============================================

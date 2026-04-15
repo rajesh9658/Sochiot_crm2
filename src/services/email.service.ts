@@ -15,7 +15,15 @@ class EmailService {
     });
   }
 
+  private shouldSkipSending() {
+    return process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+  }
+
   async sendWelcomeEmail(email: string, name: string, tempPassword?: string) {
+    if (this.shouldSkipSending()) {
+      return;
+    }
+
     const subject = 'Welcome to CRM System';
     const html = `
       <h1>Welcome ${name}!</h1>
@@ -34,6 +42,10 @@ class EmailService {
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string) {
+    if (this.shouldSkipSending()) {
+      return;
+    }
+
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
     const html = `
       <h1>Password Reset Request</h1>
@@ -57,6 +69,10 @@ class EmailService {
     tempPassword: string,
     inviteToken: string
   ) {
+    if (this.shouldSkipSending()) {
+      return;
+    }
+
     const acceptUrl = `${process.env.APP_URL}/accept-invite?token=${inviteToken}`;
     const html = `
       <h1>You've been invited to ${companyName}</h1>
@@ -75,6 +91,10 @@ class EmailService {
   }
 
   async sendExistingUserInvitation(email: string, companyName: string) {
+    if (this.shouldSkipSending()) {
+      return;
+    }
+
     const html = `
       <h1>You've been added to ${companyName}</h1>
       <p>Your account already exists.</p>

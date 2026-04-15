@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { Prisma } from "../generated/client/client";
-import { AppError } from "../utils/AppError.js";
+import { AppError } from "../utils/AppError";
 
 type PrismaKnownRequestError = Prisma.PrismaClientKnownRequestError;
 

@@ -1,20 +1,33 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import app from './app.js';
-import { prisma } from './lib/prisma.js';
+import app from './app';
+import { prisma } from './config/database';
+import { initializeSocket } from './services/notification.service';
+import { startFollowupReminderJob } from './jobs/followupReminder.job';
+import http from 'http';
 
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
-    // Test database connection
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
-    app.listen(PORT, () => {
+    const server = http.createServer(app);
+    
+    // Initialize Socket.IO for real-time notifications
+    initializeSocket(server);
+    console.log('✅ Socket.IO initialized');
+
+    // Start cron jobs
+    startFollowupReminderJob();
+    console.log('✅ Cron jobs started');
+
+    server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -24,43 +37,8 @@ const startServer = async () => {
 
 startServer();
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, closing connections...');
   await prisma.$disconnect();
   process.exit(0);
 });
-
-
-
-
-
-
-
-
-// import express from "express";
-// import cors from "cors";
-// import helmet from "helmet";
-// import morgan from "morgan";
-// import compression from "compression";
-// import dotenv from "dotenv";
-
-// dotenv.config();
-
-// const app = express();
-
-// app.use(express.json());
-// app.use(cors());
-// app.use(helmet());
-// app.use(morgan("dev"));
-// app.use(compression());
-
-// app.get("/", (req, res) => {
-//   res.send("🚀 Sochiot CRM API Running...");
-// });
-
-// const PORT = process.env.PORT || 5000;
-
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });

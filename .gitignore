@@ -5,3 +5,5 @@ node_modules
 /generated/prisma
 
 dist
+tests
+jest.config.js

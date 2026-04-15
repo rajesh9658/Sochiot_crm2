@@ -72,3 +72,14 @@ export const requireCompanyAccess = (
   }
   next();
 };
+
+
+export const requirePermission = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) =>{
+  return next();
+  // Implement permission checks based on req.user.role and required permissions for the route
+  // This is a placeholder and should be expanded based on your permission model
+};

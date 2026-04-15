@@ -9,6 +9,14 @@ import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
 import companyRoutes from './routes/company.routes';
 import planRoutes from './routes/plan.routes';
+import customerRoutes from './routes/customer.routes';
+import productInterestRoutes from './routes/product-interest.routes';
+import activityRoutes from './routes/activity.routes';
+import followupRoutes from './routes/followup.routes';
+import userRoutes from './routes/user.routes';
+import roleRoutes from './routes/role.routes';
+import dealRoutes from './routes/deal.routes';
+import paymentRoutes from './routes/payment.routes';
 
 const app = express();
 
@@ -45,6 +53,14 @@ app.use(compression());
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/plans', planRoutes);
+app.use('/api/customers', customerRoutes);                    
+app.use('/api/product-interests', productInterestRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/followups', followupRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/deals', dealRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

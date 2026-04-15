@@ -18,7 +18,7 @@ const router = Router();
 const createRoleValidation = [
   body('name').notEmpty().trim(),
   body('description').optional().trim(),
-  body('permissionIds').isArray().notEmpty(),
+  body('permissionIds').isArray({ min: 1 }),
   body('permissionIds.*').isInt()
 ];
 

@@ -2,6 +2,13 @@ import { prisma } from '../config/database';
 import type { Request } from 'express';
 
 export class AuditService {
+  private static toJsonSafe(value: any) {
+    return JSON.parse(
+      JSON.stringify(value, (_key, currentValue) =>
+        typeof currentValue === 'bigint' ? currentValue.toString() : currentValue
+      )
+    );
+  }
   
   static async log(
     data: {
@@ -28,10 +35,10 @@ export class AuditService {
       if (data.targetUserId !== undefined) createData.targetUserId = data.targetUserId;
       if (data.entityId !== undefined) createData.entityId = data.entityId;
       if (data.oldValue !== undefined) {
-        createData.oldValue = JSON.parse(JSON.stringify(data.oldValue));
+        createData.oldValue = this.toJsonSafe(data.oldValue);
       }
       if (data.newValue !== undefined) {
-        createData.newValue = JSON.parse(JSON.stringify(data.newValue));
+        createData.newValue = this.toJsonSafe(data.newValue);
       }
       const ipAddress = data.ipAddress || req?.ip;
       if (ipAddress !== undefined) createData.ipAddress = ipAddress;
