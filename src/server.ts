@@ -11,6 +11,11 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl || databaseUrl === 'null') {
+      throw new Error('DATABASE_URL is not set or is invalid. Please check your .env file.');
+    }
+    
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
